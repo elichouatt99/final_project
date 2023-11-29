@@ -58,13 +58,6 @@ cluster_heatmap <- function(tissue,traits=c("cogng_demog_slope"), num_clusters=5
   dev.off()
 }
 
-
-tissues <- c("Brain", "SpinalCord", "Muscle")
-for (tissue in tissues){
-  cluster_heatmap(tissue)
-}
-
-
 #' For a given tissue, compute the correlation matrix of its modules, its 
 #' clusters, and for each one, compute the subnetwork with traits.
 #'
@@ -72,9 +65,6 @@ for (tissue in tissues){
 #' @param traits 
 #' 
 #' @return save the subnetworks and the corresponding adjacency matrix 
-#' @export
-#'
-#' @examples
 cluster_network <- function(tissue, traits=c("cogng_demog_slope")){
   MEs <- load.data(tissue)
   matrix_cor <- qgraph::cor_auto(MEs)
@@ -90,9 +80,4 @@ cluster_network <- function(tissue, traits=c("cogng_demog_slope")){
     draw(Heatmap(Results$Network$graph))
     dev.off()
   }
-}
-
-tissues <- c("Brain", "SpinalCord", "Muscle")
-for (tissue in tissues){
-  cluster_network(tissue)
 }
