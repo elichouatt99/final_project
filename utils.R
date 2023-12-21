@@ -143,11 +143,12 @@ get_clusters <- function(matrix_cor, num_clusters=5, cut_height=NULL){
 compute_network <- function(tissues,
                             traits=c("cogng_demog_slope", "motor10_lv", "tdp_st4", "amylsqrt", "tangsqrt"),
                             cluster=NULL,
-                            pval_thr=0.1,
+                            pval_thr=0.05,
                             subset_trait=F,
                             gamma=0.5,
                             threshold=F, 
-                            penalize=F){
+                            penalize=F,
+                            boot=F){
   tissues <- sort(tissues)
   MEs <- NULL
   
@@ -157,14 +158,17 @@ compute_network <- function(tissues,
     temp.data <- load.MEs.l4(tissue)
     temp.data <- filter.length.MEs(temp.data, tissue)
     temp.SE <- readRDS(paste0("datasets/traits/SE_", tissue,"_l4.rds"))
-    if (subset_trait){
+    if (!is.null(cluster) & subset_trait){
+      temp.MEs <- filter.trait.MEs(temp.data[, cluster], temp.SE, traits, pval_thr)
+    }
+    else if (!is.null(cluster)){
+      temp.MEs <- temp.data[, cluster]
+    }
+    else if (subset_trait){
       temp.MEs <- filter.trait.MEs(temp.data, temp.SE, traits, pval_thr)
     }
     else {
       temp.MEs <- temp.data
-    }
-    if (!is.null(cluster)){
-      temp.MEs <- temp.data[, cluster]
     }
     coordinates <- list(list(coordinates = c(current_index, current_index, current_index + length(temp.MEs) - 1, current_index + length(temp.MEs)-1), value = 1))
     blocks <- append(blocks, coordinates)
@@ -203,6 +207,7 @@ compute_network <- function(tissues,
     penalizeMatrix <- matrix(1, nrow = size, ncol = size)
   }
   
+  print(penalizeMatrix)
   
   Network <- estimateNetwork(
     MEs.traits,
@@ -211,6 +216,10 @@ compute_network <- function(tissues,
     tuning = gamma,
     threshold = threshold,
     penalizeMatrix =  penalizeMatrix)
+  
+  if (boot){
+    Network <- bootThreshold(bootnet(Network))
+  }
   
   return(list(Network=Network, MEs=MEs, data=data))
 }
