@@ -6,7 +6,6 @@ library(ggplot2)
 library(ComplexHeatmap)
 
 
-
 #' compute partial correlation networks on single tissue
 #'
 #' @param tissue
@@ -17,26 +16,55 @@ library(ComplexHeatmap)
 #' @param thresholded boolean that indicates if to threshold the network
 #'
 #' @return save the network and the adjacency matrix
-part.cor.net.tissue <- function(tissue, gamma=0.5, traits=NULL, pval_thr=0.1, subset_trait=F, thresholded=F){
-  Results <- compute_network(tissue, traits=traits, pval_thr=0.1, subset_trait = subset_trait, gamma=gamma, threshold = thresholded)
+part.cor.net.tissue <- function(tissues, gamma=0.5, traits=c("cogng_demog_slope", "motor10_lv", "tdp_st4", "amylsqrt", "tangsqrt"),
+                                pval_thr=0.05, subset_trait=F, thresholded=F, penalize=F, boot=F, save=F){
+  Results <- compute_network(tissues, traits=traits, pval_thr=pval_thr, subset_trait = subset_trait, gamma=gamma, threshold = thresholded, penalize=penalize, boot=boot)
   Network <- Results$Network
   adj_matrix <- as.matrix(Network$graph)
+  tissues <- sort(tissues)
+  tissue_path <- ""
+  for (tissue in tissues){
+    tissue_path <- paste0(tissue_path, substr(tissue,1,1))
+  } 
   subset_path <- ifelse(subset_trait, "subset_net/", "full_net/")
   thr_path <- ifelse(thresholded, "thresholded/", "")
-  dir.create("plots/part_cor/final/subset_net/thresholded", showWarnings = FALSE)
-  pdf(file = paste0("plots/part_cor/final/",subset_path, thr_path, tissue,".pdf"))
+  penalize_path <- ifelse(penalize, "penalized/", "")
+  boot_path <- ifelse(boot, "boot/", "")
+  traits <- sort(traits)
+  trait_path <- ""
+  for (trait in traits){
+    if (trait_path == ""){
+      trait_path <- "_"
+    }
+    trait_path <- paste0(trait_path, substr(trait, 1, 1))
+  }
   heatmap_obj <- Heatmap(adj_matrix,
                          name = "Partial Correlation",
-                         show_row_names = TRUE)
-  plot(heatmap_obj)
-  plot(Network)
-  dev.off()
+                         show_row_names = TRUE,
+                         cluster_rows = F,
+                         cluster_columns = F)
+  if (save){
+    dir.create("plots/partial_cor/", showWarnings = FALSE)
+    dir.create(paste0("plots/partial_cor/",subset_path), showWarnings = FALSE)
+    dir.create(paste0("plots/partial_cor/", subset_path, thr_path), showWarnings = FALSE)
+    dir.create(paste0("plots/partial_cor/", subset_path, thr_path, penalize_path), showWarnings = FALSE)
+    dir.create(paste0("plots/partial_cor/", subset_path, thr_path, penalize_path,boot_path), showWarnings = FALSE)
+    dir.create(paste0("plots/partial_cor/", subset_path, thr_path, penalize_path, boot_path, pval_thr, "/"), showWarnings = FALSE)
+    
+    pdf(file = paste0("plots/partial_cor/",subset_path, thr_path, penalize_path, boot_path, pval_thr, "/", tissue_path, trait_path, "_", pval_thr, ".pdf"))
+    plot(heatmap_obj)
+    plot(Network)
+    dev.off()
+  }
+  else {
+    plot(heatmap_obj)
+    plot(Network)
+  }
 }
 
-traits <- c("cogng_demog_slope", "motor10_lv", "tdp_st4", "amylsqrt", "tangsqrt")
 tissues <- c("Muscle", "SpinalCord")
 for (tissue in tissues){
-  part.cor.net.tissue(tissue,traits=traits, subset_trait=T, thresholded=T)
+  part.cor.net.tissue(tissue, subset_trait=T, thresholded=T)
 }
 
 
@@ -157,8 +185,8 @@ gamma_analysis <- function(tissue, traits, pval_thr=0.1, subset_trait=T){
 #' @export
 #'
 #' @examples
-part_cor.cor.comp <- function(tissue, comp=F, trait=NULL, pval_thr=0.1, subset_trait=F, gamma=0.5, threshold=F, penalize=F){
-  Results <- compute_network(tissue, pval_thr=pval_thr, subset_trait=subset_trait, gamma=gamma, threshold=threshold, penalize=penalize)
+part_cor.cor.comp <- function(tissue, comp=F, trait=NULL, pval_thr=0.05, subset_trait=F, gamma=0.5, threshold=F, penalize=F){
+  Results <- compute_network(tissue, traits=trait, pval_thr=pval_thr, subset_trait=subset_trait, gamma=gamma, threshold=threshold, penalize=penalize)
   group1 <- colnames(Results$data)
   if (comp){
     group2 <- trait
@@ -181,12 +209,17 @@ part_cor.cor.comp <- function(tissue, comp=F, trait=NULL, pval_thr=0.1, subset_t
   scatterplot <- ggplot(data = correlation_data, aes(x = Correlation, y = Partial_Correlation)) +
     geom_point() +
     labs(x = "Correlation", y = "Partial Correlation") +
-    ggtitle(paste(tissue, trait,cor(correlation_data$Correlation, correlation_data$Partial_Correlation)))
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
+    ggtitle(paste(tissue, trait,cor(correlation_data$Correlation, correlation_data$Partial_Correlation))) +
+    lims(x = c(min(min(correlation_data$Correlation), -max(correlation_data$Correlation)),
+               max(-min(correlation_data$Correlation), max(correlation_data$Correlation))),
+         y = c(min(min(correlation_data$Partial_Correlation), -max(correlation_data$Partial_Correlation)),
+               max(-min(correlation_data$Partial_Correlation), max(correlation_data$Partial_Correlation))))
   filename <- paste0("plots/part_cor/final/comp/",tissue, "_", trait, ".png")
   ggsave(filename)
 }
 
-tissues <- c("Brain", "Spinal_Cord", "Muscle")
+tissues <- c("Brain","SpinalCord", "Muscle")
 for (tissue in tissues){
-  part_cor.cor.comp(tissue,comp=F)
+  part_cor.cor.comp(tissue, trait="cogng_demog_slope", comp=T)
 }
